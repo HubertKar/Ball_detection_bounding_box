@@ -241,7 +241,7 @@ def main():
         plt.savefig("plots/plot")
         plt.show()
 
-        model.save("model_fine_tuning.keras")
+        model.save("model/model_fine_tuning.keras")
         
         test_model(model, train_x, train_y, valid_x, valid_y)
 

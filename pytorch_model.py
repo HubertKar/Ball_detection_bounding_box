@@ -11,14 +11,20 @@ from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 from torchvision.models.detection import FasterRCNN
 from torchvision.models.detection.rpn import AnchorGenerator
 from torchvision.models.detection.mask_rcnn import MaskRCNNPredictor
+import json
 
 from engine import train_one_epoch, evaluate
 import transforms as T
 import utils as utils
-import json
+
+<<<<<<< HEAD
 
 def show_image(model, dataset, device):
 
+=======
+def show_image(model, dataset, device):
+
+>>>>>>> 85ad28b793ddf255b99a390c876d0ff5b1f554e6
     i = np.random.randint(0, len(dataset)-1)
     img, targets = dataset[i] # Losowa zdjęcie i maska ze zbioru testowego
     model.eval()
@@ -228,12 +234,18 @@ NUM_EPOCHS = 5
 def main():
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
-    # our dataset has two classes only - background and person
     num_classes = 2
+<<<<<<< HEAD
+
+    dataset = Dataset('data', get_transform(train=False))
+    dataset_valid = Dataset('data', get_transform(train=False))
+    dataset_test = TestDataset('test_data', get_transform(train=False))
+=======
     # use our dataset and defined transformations
     dataset = Dataset('data', get_transform(train=False))
     dataset_valid = Dataset('data', get_transform(train=False))
     dataset_test = TestDataset('test_data1', get_transform(train=False))
+>>>>>>> 85ad28b793ddf255b99a390c876d0ff5b1f554e6
 
     # split the dataset in train and test set
     indices = torch.randperm(len(dataset)).tolist()
@@ -251,7 +263,11 @@ def main():
 
     model = torchvision.models.detection.fasterrcnn_resnet50_fpn(weights="DEFAULT")
 
+<<<<<<< HEAD
+    num_classes = 2 
+=======
     num_classes = 2  
+>>>>>>> 85ad28b793ddf255b99a390c876d0ff5b1f554e6
     in_features = model.roi_heads.box_predictor.cls_score.in_features
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
 
@@ -275,11 +291,20 @@ def main():
 
     if choice == "1":
         for epoch in range(NUM_EPOCHS):
+<<<<<<< HEAD
+            train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq=10)
+=======
             train_one_epoch(model, optimizer, data_loader, device, NUM_EPOCHS, print_freq=10)
+>>>>>>> 85ad28b793ddf255b99a390c876d0ff5b1f554e6
             lr_scheduler.step()
             evaluate(model, data_loader_valid, device=device)
 
         torch.save(model.state_dict(), "model/model.pt")
+<<<<<<< HEAD
+        model_scripted = torch.jit.script(model) # Export to TorchScript
+        model_scripted.save('model/model_scripted.pt') # Save
+=======
+>>>>>>> 85ad28b793ddf255b99a390c876d0ff5b1f554e6
 
     test_model(model, dataset, dataset_valid, dataset_test, device)
     

@@ -8,6 +8,13 @@ balls = os.listdir("balls/")
 backgounds = os.listdir("backgrounds/")
 
 IMAGES_NUM = input("Podaj liczbe zdjec do wygenerowania: ")
+
+old_images = os.listdir("data/images/")
+old_labels = os.listdir("data/labels/")
+
+for file in old_images: os.remove("data/images/"+file)
+for file in old_labels: os.remove("data/labels/"+file)
+
 print("Generowanie danych...")
 for i in range(int(IMAGES_NUM)):
 
@@ -19,7 +26,7 @@ for i in range(int(IMAGES_NUM)):
     ball_id = random.randint(0, len(balls) - 1) 
     ball = cv.imread("balls/" + balls[ball_id], -1)
 
-    scale = random.randint(2, 3)/10.0
+    scale = random.randint(1, 2)/10.0
     ball_size = int(ball.shape[0]*scale)
     ball_r = int(ball.shape[0]*scale/2)
 
