@@ -186,7 +186,7 @@ def create_trajectory(model, dataset1, dataset2, device, parameters):
             center_point1[0], center_point1[1]  = torch.Tensor.numpy(torch.Tensor.cpu(center_point1[0])), torch.Tensor.numpy(torch.Tensor.cpu(center_point1[1]))
             center_point2[0], center_point2[1]  = torch.Tensor.numpy(torch.Tensor.cpu(center_point2[0])), torch.Tensor.numpy(torch.Tensor.cpu(center_point2[1]))
 
-            point3D = triangulate(parameters[0], parameters[1], parameters[2], parameters[3], center_point1, center_point2)    
+            point3D = triangulate(parameters["mtx1"], parameters["mtx2"], parameters["R"], parameters["T"], center_point1, center_point2)    
             trajecotry.append(point3D)
             trajecotry_x.append(point3D[0])
             trajecotry_y.append(point3D[1])
@@ -262,7 +262,7 @@ def trajectory_visualization(model, dataset1, dataset2, device, parameters):
             center_point1[0], center_point1[1]  = torch.Tensor.numpy(torch.Tensor.cpu(center_point1[0])), torch.Tensor.numpy(torch.Tensor.cpu(center_point1[1]))
             center_point2[0], center_point2[1]  = torch.Tensor.numpy(torch.Tensor.cpu(center_point2[0])), torch.Tensor.numpy(torch.Tensor.cpu(center_point2[1]))
 
-            point3D = triangulate(parameters[0], parameters[1], parameters[2], parameters[3], center_point1, center_point2)    
+            point3D = triangulate(parameters["mtx1"], parameters["mtx2"], parameters["R"], parameters["T"], center_point1, center_point2)    
             trajecotry.append(point3D)
             trajecotry_x.append(point3D[0])
             trajecotry_y.append(point3D[1])
@@ -298,21 +298,26 @@ def trajectory_visualization(model, dataset1, dataset2, device, parameters):
     plt.show()
 
 def load_calibration_parameters(sequence_nr):
-    parameters = []
-    
+
     with open("calibration_parameters/" + sequence_nr + "/camera_1.yaml") as f:
         loadeddict = yaml.safe_load(f)
-    parameters.append(loadeddict.get('camera_matrix'))
+    mtx1 = loadeddict.get('camera_matrix')
 
     with open("calibration_parameters/" + sequence_nr + "/camera_2.yaml") as f:
         loadeddict = yaml.safe_load(f)
-    parameters.append(loadeddict.get('camera_matrix'))
+    mtx2 = loadeddict.get('camera_matrix')
 
     with open("calibration_parameters/" + sequence_nr + "/stereovision.yaml") as f:
         loadeddict = yaml.safe_load(f)
-    parameters.append(loadeddict.get('rotation matrix'))
-    parameters.append(loadeddict.get('translation vector'))
+    R = loadeddict.get('rotation matrix')
+    T = loadeddict.get('translation vector')
 
+    parameters = { 
+        "mtx1" : mtx1,
+        "mtx2" : mtx2,
+        "R": R,
+        "T": T 
+    }
     return parameters
 
 def load_model():
