@@ -11,12 +11,15 @@ from tkinter import Tcl
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 import utils as utils
 
+# Input image dimensions and image dimensions used in model
 INPUT_W, INPUT_H = 2048, 1080
 IMG_W, IMG_H = 1280, 720
 
+# Function for displaying frames from 2 cameras with detected volleyball
 def show_test_image(model, dataset1, dataset2, device, parameters):
     i = np.random.randint(0, len(dataset1)-1)
 
+    # Get random image from 2 cameras (taken at same time) 
     img1 = dataset1[i]
     transform = torchvision.transforms.Compose([torchvision.transforms.PILToTensor()])
     img1 = transform(img1)
@@ -32,6 +35,7 @@ def show_test_image(model, dataset1, dataset2, device, parameters):
         prediction1 = model([img1.to(device)])
         prediction2 = model([img2.to(device)])
 
+    # Get predicion boxes
     prediction_boxes1 = prediction1[0]["boxes"]
     prediction_scores1 = prediction1[0]["scores"]
     prediction_scores1 = torch.Tensor.cpu(prediction_scores1)
@@ -43,6 +47,7 @@ def show_test_image(model, dataset1, dataset2, device, parameters):
     img1 = Image.fromarray(img1.mul(255).permute(1, 2, 0).byte().numpy())
     img2 = Image.fromarray(img2.mul(255).permute(1, 2, 0).byte().numpy())
 
+    # If any volleyball was detected draw predicted bounding box
     if len(prediction_scores1) != 0: 
         prediction_box1 = prediction_boxes1[np.argmax(prediction_scores1)] 
         img1_d = ImageDraw.Draw(img1)
@@ -53,31 +58,37 @@ def show_test_image(model, dataset1, dataset2, device, parameters):
         img2_d = ImageDraw.Draw(img2)
         img2_d.rectangle((prediction_box2[0], prediction_box2[1], prediction_box2[2], prediction_box2[3]), outline ="blue", width=3)
 
-
+    # If volleyball was detected on both frames calculate postion of ball centre in 3D space (realtive to 1st camera)
     if len(prediction_scores1) != 0 and len(prediction_scores2) != 0:
-        print("Wykryto piłke")
+        print("Ball detected")
+        # Get center point positon and multiply it by INPUT_W/IMG_W, calibration was made on 2048x1080 pixels, model use 1280x720 images
         center_point1 = [(prediction_box1[1] + prediction_box1[0])/2 * INPUT_W/IMG_W, (prediction_box1[3] + prediction_box1[2])/2 * INPUT_H/IMG_H]
         center_point2 = [(prediction_box2[1] + prediction_box2[0])/2 * INPUT_W/IMG_W, (prediction_box2[3] + prediction_box2[2])/2 * INPUT_H/IMG_H]
 
+        # Convert to numpy array
         center_point1[0], center_point1[1]  = torch.Tensor.numpy(torch.Tensor.cpu(center_point1[0])), torch.Tensor.numpy(torch.Tensor.cpu(center_point1[1]))
         center_point2[0], center_point2[1]  = torch.Tensor.numpy(torch.Tensor.cpu(center_point2[0])), torch.Tensor.numpy(torch.Tensor.cpu(center_point2[1]))
 
+        # calculate 3D position using traingulation
         point3D = triangulate(parameters[0], parameters[1], parameters[2], parameters[3], center_point1, center_point2)     
         print(point3D)
     else:
-        print("Nie wykryto piłki")
-        
+        print("Ball NOT detected")
+    
+    # Show frame from fisrt camera
     plt.subplot(121)
     plt.imshow(img1)
     plt.axis('off')
     plt.title('First camera')
-
+    
+    # Show frame from second camera
     plt.subplot(122)
     plt.imshow(img2)
     plt.axis('off')
     plt.title('Second camera')
 
-class Next_button_test(object):  # Klasa do przycisku zarządzania przyciskiem w funkcji test_model
+# class for button
+class Next_button_test(object): 
     def __init__(self, axes, label, dataset1, dataset2, model, device, parameters):
         self.button = Button(axes, label)
         self.button.on_clicked(self.clicked)
@@ -91,7 +102,8 @@ class Next_button_test(object):  # Klasa do przycisku zarządzania przyciskiem w
         show_test_image(self.model, self.dataset1, self.dataset2, self.device, self.parameters)
         plt.draw()
 
-def test_model_on_random_img(model, dataset1, dataset2, device, parameters): # Funckja do testowania działania sieci 
+# Function for testing on random images 
+def test_model_on_random_img(model, dataset1, dataset2, device, parameters): 
 
     fig = plt.figure(figsize=(15, 8))
     show_test_image(model, dataset1, dataset2, device, parameters)
@@ -99,6 +111,7 @@ def test_model_on_random_img(model, dataset1, dataset2, device, parameters): # F
     b3next = Next_button_test(a3xnext, "NEXT IMG", dataset1, dataset2,  model, device, parameters)
     plt.show()
 
+# Dataset class
 class TestDataset(torch.utils.data.Dataset):
     def __init__(self, root):
         self.root = root
@@ -116,7 +129,9 @@ class TestDataset(torch.utils.data.Dataset):
 
     def __len__(self):
         return len(self.imgs)
-    
+
+# Function for traigulation, takes camera matrix for both cameras and rotation and translation matrixs,
+# return 3D position
 def triangulate(mtx1, mtx2, R, T, point1, point2):
  
     #RT matrix for C1 is identity.
@@ -147,6 +162,7 @@ def triangulate(mtx1, mtx2, R, T, point1, point2):
 
     return point3D
 
+# Function for calculating ball trajectory, without showing frames, only 3D plot 
 def create_trajectory(model, dataset1, dataset2, device, parameters):
     trajecotry = []
     trajecotry_x = []
@@ -176,6 +192,7 @@ def create_trajectory(model, dataset1, dataset2, device, parameters):
         prediction_scores2 = prediction2[0]["scores"]
         prediction_scores2 = torch.Tensor.cpu(prediction_scores2)
 
+        # If volleyball was detected on both frames calculate postion of ball centre in 3D space (realtive to 1st camera)
         if len(prediction_scores1) != 0 and len(prediction_scores2) != 0:
             prediction_box1 = prediction_boxes1[np.argmax(prediction_scores1)]
             prediction_box2= prediction_boxes2[np.argmax(prediction_scores2)]
@@ -194,10 +211,12 @@ def create_trajectory(model, dataset1, dataset2, device, parameters):
             
             print(point3D)
         else:
-            print("Nie wykryto piłki")
+            print("Ball NOT detected")
 
     print("done")
     print(trajecotry)
+
+    # Show 3D graph of ball trajectory
     ax = plt.figure().add_subplot(projection='3d')
     ax.plot(trajecotry_x, trajecotry_y, trajecotry_z, label='trajectory')
     ax.set_xlim(-2, 1)
@@ -209,6 +228,8 @@ def create_trajectory(model, dataset1, dataset2, device, parameters):
 
     plt.show()
 
+# Function for trajectory_visualization, shows folowing frames from sequnce and generated trajectory,
+# work similar to show_test_image and create_trajectory combined
 def trajectory_visualization(model, dataset1, dataset2, device, parameters):
     trajecotry = []
     trajecotry_x = []
@@ -270,7 +291,7 @@ def trajectory_visualization(model, dataset1, dataset2, device, parameters):
             
             print(point3D)
         else:
-            print("Nie wykryto piłki")
+            print("Ball NOT detected")
 
         plt.subplot(131)
         plt.imshow(img1)
@@ -297,6 +318,7 @@ def trajectory_visualization(model, dataset1, dataset2, device, parameters):
 
     plt.show()
 
+# Function for loading calibration parameters from file, retrun dictonary with parameters
 def load_calibration_parameters(sequence_nr):
 
     with open("calibration_parameters/" + sequence_nr + "/camera_1.yaml") as f:
@@ -320,6 +342,7 @@ def load_calibration_parameters(sequence_nr):
     }
     return parameters
 
+# Function for loading model
 def load_model():
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
@@ -339,6 +362,7 @@ def load_model():
     return model, device
 
 def main():
+    # Loading model in diffrent way, doesn't work properly
     # model = torch.jit.load('model/model_scripted.pt') # load model
     # model.eval()
     # device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')

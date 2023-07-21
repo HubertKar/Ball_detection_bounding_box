@@ -8,8 +8,6 @@ import matplotlib.pyplot as plt
 from matplotlib.widgets import Button
 from PIL import Image, ImageDraw
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
-from torchvision.models.detection import FasterRCNN
-from torchvision.models.detection.rpn import AnchorGenerator
 from torchvision.models.detection.mask_rcnn import MaskRCNNPredictor
 import json
 
@@ -17,19 +15,27 @@ from engine import train_one_epoch, evaluate
 import transforms as T
 import utils as utils
 
+# Program for training and testing model for boudning box detecion with pytorch
+
+# Function for displaying two images using matplotlib (trainig and valid set)
 def show_image(model, dataset, device):
+    
+    # Get random image from dataset and predict bounding box for it
     i = np.random.randint(0, len(dataset)-1)
     img, targets = dataset[i] # Losowa zdjęcie i maska ze zbioru testowego
     model.eval()
     with torch.no_grad():
         prediction = model([img.to(device)])
 
+    # Get bounding box
     prediction_boxes = prediction[0]["boxes"]
     prediction_scores = prediction[0]["scores"]
     prediction_scores = torch.Tensor.cpu(prediction_scores)
 
+    # Get one bounding box with max score
     prediction_box = prediction_boxes[np.argmax(prediction_scores)]
 
+    # Convert to image
     img1 = Image.fromarray(img.mul(255).permute(1, 2, 0).byte().numpy())
     img2 = Image.fromarray(img.mul(255).permute(1, 2, 0).byte().numpy())
 
@@ -37,20 +43,26 @@ def show_image(model, dataset, device):
     img1_d = ImageDraw.Draw(img1) 
     img2_d = ImageDraw.Draw(img2)
 
+    # Draw bounding box on image
     img1_d.rectangle((sample_box[0, 0], sample_box[0, 1], sample_box[0, 2], sample_box[0, 3]), outline ="red", width=3)
     img2_d.rectangle((prediction_box[0], prediction_box[1], prediction_box[2], prediction_box[3]), outline ="blue", width=3)
 
+    # Show "Ground true" image
     plt.subplot(121)
     plt.imshow(img1)
     plt.axis('off')
     plt.title('Ground true')
 
+    # Show "Predicted" image
     plt.subplot(122)
     plt.imshow(img2)
     plt.axis('off')
     plt.title('Predicted')
 
+# Function for prediction result on real photos ("test" dataset, images without known boudnig box positions)
 def show_test_image(model, dataset, device):
+
+    # Get random image from dataset and proces it 
     i = np.random.randint(0, len(dataset)-1)
     img = dataset[i]
 
@@ -59,42 +71,46 @@ def show_test_image(model, dataset, device):
     img = img/255.0
 
     model.eval()
- 
 
     with torch.no_grad():
         prediction = model([img.to(device)])
 
     print(prediction)
 
+    # Get prediction boxes
     prediction_boxes = prediction[0]["boxes"]
     prediction_scores = prediction[0]["scores"]
     prediction_scores = torch.Tensor.cpu(prediction_scores)
 
+    # Check if any ball was detected
     if len(prediction_scores) != 0: 
         prediction_box = prediction_boxes[np.argmax(prediction_scores)]
-        print("Wykryto piłke")
+        print("ball detected")
     else:
         prediction_box = [0,0,0,0]
-        print("Nie wykryto piłki")
+        print("ball NOT detected")
 
     img1 = Image.fromarray(img.mul(255).permute(1, 2, 0).byte().numpy())
     img2 = Image.fromarray(img.mul(255).permute(1, 2, 0).byte().numpy())
 
+    # Draw bounding box on image
     img2_d = ImageDraw.Draw(img2)
-
     img2_d.rectangle((prediction_box[0], prediction_box[1], prediction_box[2], prediction_box[3]), outline ="blue", width=3)
 
+    # Show photo
     plt.subplot(121)
     plt.imshow(img1)
     plt.axis('off')
     plt.title('Image')
 
+    # Show photo wit predicted bounding box
     plt.subplot(122)
     plt.imshow(img2)
     plt.axis('off')
     plt.title('Predicted box')
 
-class Next_button(object):  # Klasa do przycisku zarządzania przyciskiem w funkcji test_model
+# Button class for test_model function
+class Next_button(object): 
     def __init__(self, axes, label, dataset, model, device):
         self.button = Button(axes, label)
         self.button.on_clicked(self.clicked)
@@ -106,7 +122,8 @@ class Next_button(object):  # Klasa do przycisku zarządzania przyciskiem w funk
         show_image(self.model, self.dataset, self.device)
         plt.draw()
 
-class Next_button_test(object):  # Klasa do przycisku zarządzania przyciskiem w funkcji test_model
+# Button class for test_model function
+class Next_button_test(object):  
     def __init__(self, axes, label, dataset, model, device):
         self.button = Button(axes, label)
         self.button.on_clicked(self.clicked)
@@ -118,7 +135,8 @@ class Next_button_test(object):  # Klasa do przycisku zarządzania przyciskiem w
         show_test_image(self.model, self.dataset, self.device)
         plt.draw()
 
-def test_model(model, trainig_dataset, valid_dataset, test_dataset, device): # Funckja do testowania działania sieci 
+# Function for testing and viusalization 
+def test_model(model, trainig_dataset, valid_dataset, test_dataset, device): 
 
     fig = plt.figure(figsize=(10,5))
     show_image(model, trainig_dataset, device)
@@ -129,9 +147,9 @@ def test_model(model, trainig_dataset, valid_dataset, test_dataset, device): # F
     b2next = Next_button(a2xnext, "NEXT(Valid)", valid_dataset, model, device)
     b3next = Next_button_test(a3xnext, "NEXT(TEST)", test_dataset, model, device)
 
-    
     plt.show()
 
+# Dataset class
 class Dataset(torch.utils.data.Dataset):
     def __init__(self, root, transforms):
         self.root = root
@@ -141,13 +159,15 @@ class Dataset(torch.utils.data.Dataset):
         self.labels = list(sorted(os.listdir(os.path.join(root, "labels"))))     
 
     def __getitem__(self, idx):
-
+        
+        # Get image
         img_path = os.path.join(self.root, "images", self.imgs[idx])
         labels_path = os.path.join(self.root, "labels", self.labels[idx])
         img = Image.open(img_path).convert("RGB")
 
         num_objs = 1
 
+        # Read bounding box position
         boxes = []
         f = open(labels_path)
         data_j = json.load(f)
@@ -182,6 +202,7 @@ class Dataset(torch.utils.data.Dataset):
     def __len__(self):
         return len(self.imgs)
 
+# Test Dataset class (for data without info about bounding box, unlabeled data)
 class TestDataset(torch.utils.data.Dataset):
     def __init__(self, root, transforms):
         self.root = root
@@ -222,22 +243,25 @@ def get_transform(train):
         transforms.append(T.RandomHorizontalFlip(0.5))
     return T.Compose(transforms)
 
+# Number of trainig epochs
 NUM_EPOCHS = 5
 
 def main():
+    # Get device, gpu with cuda is default
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     
-    # use our dataset and defined transformations
+    # Get trainig, valid and "test"* dataset
+    # *test dataset contains real frames from cameras, without info about bounding box, only for visualization
     dataset = Dataset('data', get_transform(train=False))
     dataset_valid = Dataset('data', get_transform(train=False))
-    dataset_test = TestDataset('test_data1', get_transform(train=False))
+    dataset_test = TestDataset('test_data', get_transform(train=False))
 
-    # split the dataset in train and test set
+    # Split the dataset in train and valid set
     indices = torch.randperm(len(dataset)).tolist()
     dataset = torch.utils.data.Subset(dataset, indices[:-50])
     dataset_valid = torch.utils.data.Subset(dataset_valid, indices[-50:])
 
-    # define training and validation data loaders
+    # Define training and validation data loaders
     data_loader = torch.utils.data.DataLoader(
         dataset, batch_size=4, shuffle=True, num_workers=4,
         collate_fn=utils.collate_fn)
@@ -246,41 +270,44 @@ def main():
         dataset_valid, batch_size=1, shuffle=False, num_workers=4,
         collate_fn=utils.collate_fn)
 
+    # Load pretrained model resnet50
     model = torchvision.models.detection.fasterrcnn_resnet50_fpn(weights="DEFAULT")
 
     num_classes = 2 
     in_features = model.roi_heads.box_predictor.cls_score.in_features
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
 
-    # move model to the right device
+    # Move model to the right device
     model.to(device)
 
-    # optimizer
+    # Optimizer
     params = [p for p in model.parameters() if p.requires_grad]
     optimizer = torch.optim.SGD(params, lr=0.005,
                                 momentum=0.9, weight_decay=0.0005)
-    # learning rate scheduler
+    # Learning rate scheduler
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer,
                                                    step_size=3,
                                                    gamma=0.1)
     
+    # Load trained model or train a new one
     choice = input("Load or create new model [0, 1]: ")
 
-    if choice == "0":
-        model.load_state_dict(torch.load("model/model.pt"))
+    if choice == "0": 
+        model.load_state_dict(torch.load("model/model.pt")) # Load model from "model" catalog
         model.eval()
 
     if choice == "1":
-        for epoch in range(NUM_EPOCHS):
+        for epoch in range(NUM_EPOCHS): # Traing loop
             train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq=10)
             train_one_epoch(model, optimizer, data_loader, device, NUM_EPOCHS, print_freq=10)
             lr_scheduler.step()
             evaluate(model, data_loader_valid, device=device)
 
-        torch.save(model.state_dict(), "model/model.pt")
+        torch.save(model.state_dict(), "model/model.pt") # Save model
         model_scripted = torch.jit.script(model) # Export to TorchScript
-        model_scripted.save('model/model_scripted.pt') # Save
+        model_scripted.save('model/model_scripted.pt') # Save (this version doesn't work for some reason)
 
+    # Test model
     test_model(model, dataset, dataset_valid, dataset_test, device)
     
 if __name__ == "__main__":

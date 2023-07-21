@@ -1,12 +1,15 @@
 import cv2 as cv
 import glob
 import numpy as np
-import matplotlib.pyplot as plt
 import yaml
 import os
 
+# Program for calibrating cameras for sterovision 
+
+# Estimated dimensions of calibration pattern (real dimensions were not given)
 WORLD_SCALING = 0.08
 
+# Function for genreating blob detector for detecting circular calibration pattern 
 def create_blob_detector():
     # Setup SimpleBlobDetector parameters.
     blobParams = cv.SimpleBlobDetector_Params()
@@ -36,8 +39,9 @@ def create_blob_detector():
     blobDetector = cv.SimpleBlobDetector_create(blobParams)
     return blobDetector
 
-def calibrate_camera(images_folder, show_patter = False):
-
+# Function for calibrating single camera
+def calibrate_camera(images_folder, show_pattern = False):
+    # Get calibration images list
     images_names = sorted(glob.glob(images_folder))
     images = []
     for imname in images_names:
@@ -50,25 +54,26 @@ def calibrate_camera(images_folder, show_patter = False):
     rows = 8 
     columns = 6 
 
-    # coordinates of squares in the CirclesGrid world space
+    # Coordinates of squares in the CirclesGrid world space
     objp = np.zeros((rows*columns,3), np.float32)
     objp[:,:2] = np.mgrid[0:rows,0:columns].T.reshape(-1,2)
     objp = WORLD_SCALING* objp
  
-    # frame dimensions
+    # Frame dimensions
     width = images[0].shape[1]
     height = images[0].shape[0]
  
     # Pixel coordinates of CirclesGrid
     imgpoints = [] # 2d points in image plane.
  
-    # coordinates of the CirclesGrid in CirclesGrid world space.
+    # Coordinates of the CirclesGrid in CirclesGrid world space.
     objpoints = [] # 3d point in real world space
     
-    # blob detector
+    # Blob detector
     blobDetector = create_blob_detector() 
 
-    for frame in images:
+    for frame in images: # for every image in calibration image list
+        # Convert to gray scale
         img_gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
         
         keypoints = blobDetector.detect(img_gray)
@@ -76,13 +81,12 @@ def calibrate_camera(images_folder, show_patter = False):
         im_with_keypoints = cv.drawKeypoints(frame, keypoints, np.array([]), (0,255,0), cv.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
         im_with_keypoints_gray = cv.cvtColor(im_with_keypoints, cv.COLOR_BGR2GRAY)
 
-        # find the CircleGrid
+        # Find the CircleGrid
         ret, corners = cv.findCirclesGrid(im_with_keypoints, (rows, columns), None, flags = cv.CALIB_CB_SYMMETRIC_GRID)   # Find the circle grid
  
         if ret == True:
- 
             corners = cv.cornerSubPix(im_with_keypoints_gray, corners, (4, 4), (-1, -1), criteria)
-            if show_patter == True: # If show_patter == True show detected calibration pattern
+            if show_pattern == True: # If show_patter == True show detected calibration pattern
                 cv.drawChessboardCorners(frame, (rows,columns), corners, ret)
                 cv.imshow('img', frame)
                 k = cv.waitKey(500)
@@ -95,8 +99,10 @@ def calibrate_camera(images_folder, show_patter = False):
 
     return mtx, dist
 
-def stereo_calibrate(mtx1, dist1, mtx2, dist2, images_path1, images_path2, show_pattern = False):
+# Function for calibrating pair of cameras for sterovision
+def stereo_calibrate(mtx1, dist1, mtx2, dist2, images_path1, images_path2, show_pattern = True):
 
+    # Get calibration images list for both cameras
     c1_images_names = sorted(glob.glob(images_path1))
     c2_images_names = sorted(glob.glob(images_path2))
 
@@ -112,6 +118,7 @@ def stereo_calibrate(mtx1, dist1, mtx2, dist2, images_path1, images_path2, show_
  
     criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 100, 0.0001)
  
+    # Same steps as in single camera calibration
     rows = 8
     columns = 6
  
@@ -166,10 +173,12 @@ def stereo_calibrate(mtx1, dist1, mtx2, dist2, images_path1, images_path2, show_
     stereocalibration_flags = cv.CALIB_FIX_INTRINSIC
     ret, CM1, dist1, CM2, dist2, R, T, E, F = cv.stereoCalibrate(objpoints, imgpoints1, imgpoints2, mtx1, dist1,
                                                                  mtx2, dist2, (width, height), criteria = criteria, flags = stereocalibration_flags)
-    return R, T
+    return R, T # Return rotation and translation matrixs 
 
+# Function for saving calibration parmaters camera matrix, distortion coefficients for both cameras and rotation and translation matrixs
 def save_parameters(mtx1, dist1, mtx2, dist2, R, T, path):
 
+    # Save calibration parmaters in yaml file in "calibration_parameters" catalog
     data = {'camera_matrix': np.asarray(mtx1).tolist(), 'dist_coeff': np.asarray(dist1).tolist()}
     with open(os.path.join(path, "camera_1.yaml"), "w") as f:
         yaml.dump(data, f)
@@ -193,7 +202,6 @@ def main():
     print("Sterovison calibration...")
     R, T = stereo_calibrate(mtx1, dist1, mtx2, dist2, "sekwencje/sequence_3/camera_1/calib/*", "sekwencje/sequence_3/camera_2/calib/*")
     print("Sterovison calibration completed, Parameters saved to /calibration_parameters")
-
 
     save_parameters(mtx1, dist1, mtx2, dist2, R, T, "calibration_parameters/sequence_3")
 

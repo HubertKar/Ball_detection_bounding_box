@@ -7,6 +7,8 @@ import os
 import json
 from matplotlib.widgets import Button
 
+# Program for training model with keras (NOT WORKING)
+
 IMAGE_W = 800
 IMAGE_H = 800
 LR_VALUE = 0.001
@@ -68,8 +70,7 @@ def test_model(model, trainig_images, trainig_labels, valid_images, valid_labels
     a2xnext = fig.add_axes([0.71, 0.05, 0.1, 0.075])
     bnext = Next_button(axnext, "NEXT(Trainig)", trainig_images, trainig_labels, model)
     b2next = Next_button(a2xnext, "NEXT(Valid)", valid_images, valid_labels, model)
-
-    
+ 
     plt.show()
 
 def create_model():
